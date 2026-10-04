@@ -11,12 +11,14 @@ from telegram.ext import (
     ContextTypes,
 )
 
+
 TOKEN = os.getenv("BOT_TOKEN")
+RENDER_URL = os.getenv("RENDER_EXTERNAL_URL")
 
 DB = "kasbeno.db"
 
 
-# ---------------- DATABASE ----------------
+# ================= DATABASE =================
 
 def db():
     return sqlite3.connect(DB)
@@ -77,22 +79,10 @@ def get_user(user_id):
     return user
 
 
-def update_balance(user_id, amount):
-    con = db()
-    cur = con.cursor()
-
-    cur.execute(
-        "UPDATE users SET balance = balance + ? WHERE user_id = ?",
-        (amount, user_id)
-    )
-
-    con.commit()
-    con.close()
-
-
-# ---------------- MENU ----------------
+# ================= MENU =================
 
 def main_menu():
+
     keyboard = [
         [
             InlineKeyboardButton("⛏️ Mining", callback_data="mine"),
@@ -111,7 +101,7 @@ def main_menu():
     return InlineKeyboardMarkup(keyboard)
 
 
-# ---------------- START ----------------
+# ================= START =================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -120,6 +110,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     referred_by = None
 
     if context.args:
+
         try:
             ref = int(context.args[0])
 
@@ -146,7 +137,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ---------------- MINING ----------------
+# ================= MINING =================
 
 async def mining(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -159,6 +150,7 @@ async def mining(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.utcnow()
 
     if user[3]:
+
         last_mine = datetime.fromisoformat(user[3])
 
         if now - last_mine < timedelta(hours=24):
@@ -181,7 +173,12 @@ async def mining(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cur = con.cursor()
 
     cur.execute(
-        "UPDATE users SET balance = balance + 10, last_mine = ? WHERE user_id = ?",
+        """
+        UPDATE users
+        SET balance = balance + 10,
+            last_mine = ?
+        WHERE user_id = ?
+        """,
         (now.isoformat(), user_id)
     )
 
@@ -190,12 +187,11 @@ async def mining(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.message.reply_text(
         "⛏️ Mining completed!\n\n"
-        "🎁 You received **10 points**.",
-        parse_mode="Markdown"
+        "🎁 You received 10 points."
     )
 
 
-# ---------------- LUCKY WHEEL ----------------
+# ================= LUCKY WHEEL =================
 
 async def wheel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -241,7 +237,8 @@ async def wheel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cur.execute(
         """
         UPDATE users
-        SET balance = balance + ?, last_wheel = ?
+        SET balance = balance + ?,
+            last_wheel = ?
         WHERE user_id = ?
         """,
         (prize, now.isoformat(), user_id)
@@ -252,12 +249,11 @@ async def wheel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.message.reply_text(
         f"🎡 Lucky Wheel!\n\n"
-        f"🎁 You won **{prize} points**!",
-        parse_mode="Markdown"
+        f"🎁 You won {prize} points!"
     )
 
 
-# ---------------- WALLET ----------------
+# ================= WALLET =================
 
 async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -266,18 +262,15 @@ async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = get_user(query.from_user.id)
 
-    balance = user[2]
-
     await query.message.reply_text(
         f"💰 Your Wallet\n\n"
-        f"💵 Balance: **{balance} points**\n\n"
-        f"💳 Withdrawals will be enabled after "
-        f"the payment system is connected.",
-        parse_mode="Markdown"
+        f"💵 Balance: {user[2]} points\n\n"
+        "💳 Withdrawals will be enabled after "
+        "the payment system is connected."
     )
 
 
-# ---------------- REFERRALS ----------------
+# ================= REFERRALS =================
 
 async def referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -285,7 +278,6 @@ async def referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user_id = query.from_user.id
-
     bot_username = context.bot.username
 
     referral_link = (
@@ -299,7 +291,7 @@ async def referrals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ---------------- TASKS ----------------
+# ================= TASKS =================
 
 async def tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -308,12 +300,11 @@ async def tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.message.reply_text(
         "🎯 Tasks\n\n"
-        "No tasks are available yet.\n"
-        "New tasks will appear here soon."
+        "No tasks are available yet."
     )
 
 
-# ---------------- LANGUAGE ----------------
+# ================= LANGUAGE =================
 
 async def language(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -336,7 +327,7 @@ async def language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ---------------- BUTTON HANDLER ----------------
+# ================= BUTTONS =================
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -364,18 +355,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Language saved!")
 
 
-# ---------------- MAIN ----------------
+# ================= MAIN =================
 
 def main():
 
     if not TOKEN:
-        raise ValueError(
-            "BOT_TOKEN environment variable is missing."
-        )
+        raise ValueError("BOT_TOKEN is missing.")
+
+    if not RENDER_URL:
+        raise ValueError("RENDER_EXTERNAL_URL is missing.")
 
     init_db()
 
-    application = Application.builder().token(TOKEN).build()
+    application = (
+        Application.builder()
+        .token(TOKEN)
+        .build()
+    )
 
     application.add_handler(
         CommandHandler("start", start)
@@ -385,9 +381,17 @@ def main():
         CallbackQueryHandler(button_handler)
     )
 
-    print("Kasbeno Bot is running...")
+    webhook_url = f"{RENDER_URL}/telegram"
 
-    application.run_polling()
+    print("Kasbeno Bot starting...")
+    print(f"Webhook: {webhook_url}")
+
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.getenv("PORT", "10000")),
+        url_path="telegram",
+        webhook_url=webhook_url
+    )
 
 
 if __name__ == "__main__":
